@@ -24,10 +24,8 @@ async def revgif(bot, ev):
     match = re.match(r"\[CQ:reply,id=(?P<id>.*)\]\[CQ:", str(ev.message))
     if match is not None:
         message_id = match.group("id")
-        print(message_id)
         pre_message = await bot.get_msg(message_id=message_id)
         pre_raw_message = pre_message["message"]
-        print(pre_message, "\nwwww", pre_raw_message)
         await match_revgif(bot, ev, custom=pre_raw_message)
     else:
         await match_revgif(bot, ev)
@@ -40,33 +38,34 @@ async def match_revgif(bot, ev, custom=None):
     match = re.match(r"(.*)\[CQ:image(.*?)url=(?P<url>.*)\]", str(ev.message))
     if match is not None:
         image_url = match.group("url")
-        print(image_url)
         await do_revgif(bot, ev, image_url)
     else:
-        print("CQ码内未找到图片信息")
-        return
+        await bot.finish(ev, "未找到图片信息，请尝试重新发送图片")
 
 
 async def do_revgif(bot, ev, image_url):
     print("正在准备图片")
     response = requests.get(image_url, headers=headers)
     image = Image.open(BytesIO(response.content))
+    print(f"frames:{image.n_frames}, mode:{image.mode}, info:{image.info}")
+
+    if image.n_frames == 1:
+        await bot.finish(ev, "并非GIF图片")
+    if image.n_frames > 200:
+        await bot.finish(ev, "GIF帧数太多了，懒得倒放[CQ:face,id=13]")
 
     sequence = []
     for f in ImageSequence.Iterator(image):
         sequence.append(f.copy())
-    print(len(sequence))
-    if len(sequence) == 1:
-        print("并非GIF图片")
-        return
-    if len(sequence) > 200:
-        await bot.finish(ev, "GIF帧数太多了，懒得倒放[CQ:face,id=13]")
-    await bot.send(ev, "ℹ正在翻转图片序列，请稍候")
+    if len(sequence) > 30:
+        await bot.send(ev, "ℹ正在翻转图片序列，请稍候")
     sequence.reverse()
     gif_path = os.path.join(fd, f"{ev.user_id}.gif")
     sequence[0].save(gif_path, save_all=True,
-                     append_images=sequence[1:])
+                     append_images=sequence[1:], disposal=1, loop=0)
 
     if os.path.exists(gif_path):
         await bot.send(ev, f"[CQ:image,file=file:///{gif_path}]")
         os.remove(gif_path)
+    else:
+        await bot.finish(ev, "写入文件时发生未知错误")
