@@ -48,6 +48,7 @@ async def do_revgif(bot, ev, image_url):
     response = requests.get(image_url, headers=headers)
     image = Image.open(BytesIO(response.content))
     print(f"frames:{image.n_frames}, mode:{image.mode}, info:{image.info}")
+    duration = image.info["duration"]
 
     if image.n_frames == 1:
         await bot.finish(ev, "并非GIF图片")
@@ -62,7 +63,7 @@ async def do_revgif(bot, ev, image_url):
     sequence.reverse()
     gif_path = os.path.join(fd, f"{ev.user_id}.gif")
     sequence[0].save(gif_path, save_all=True,
-                     append_images=sequence[1:], disposal=1, loop=0)
+                     append_images=sequence[1:], format='GIF', disposal=2, duration=duration, loop=0)
 
     if os.path.exists(gif_path):
         await bot.send(ev, f"[CQ:image,file=file:///{gif_path}]")
